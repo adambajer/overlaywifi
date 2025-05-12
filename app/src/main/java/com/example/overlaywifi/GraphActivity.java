@@ -23,25 +23,23 @@ import java.util.Date;
 import java.util.Locale;
 
 public class GraphActivity extends AppCompatActivity {
-    private TimelineView timeline;
+    private TimelineView         timeline;
     private HorizontalScrollView scroll;
-    private View handleLine;
-    private TextView info;
-    private Button btnZoomIn, btnZoomOut, btnViewCsv;
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private View                 dragKnob, handleLine;
+    private TextView             info;
+    private Button               btnZoomIn, btnZoomOut, btnViewCsv;
+    private final Handler        handler = new Handler(Looper.getMainLooper());
+    private float                knobStartX, knobInitialTranslate;
 
-    // Drag state
-    private float downX, startTX;
-
-    // Zoom support
+    // pinch-zoom detector
     private ScaleGestureDetector scaleDetector;
-    private float scaleFactor = 1.0f;
+    private float                scaleFactor = 1.0f;
 
-    // Refresh every 30s
+    // slower refresher: every 30 seconds
     private final Runnable refresher = new Runnable() {
         @Override
         public void run() {
-            timeline.refresh();
+            if (timeline != null) timeline.refresh();
             handler.postDelayed(this, 30_000);
         }
     };
@@ -51,19 +49,25 @@ public class GraphActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_graph);
 
-        // Bind views
+        // bind views
         timeline   = findViewById(R.id.timeline);
         scroll     = findViewById(R.id.scroll);
         handleLine = findViewById(R.id.handle_line);
         info       = findViewById(R.id.info);
+        dragKnob   = findViewById(R.id.info);
         btnZoomIn  = findViewById(R.id.btn_zoom_in);
         btnZoomOut = findViewById(R.id.btn_zoom_out);
         btnViewCsv = findViewById(R.id.btn_view_csv);
 
-        // Initial draw
+        // initial draw
         timeline.refresh();
 
-        // Pinch-to-zoom setup
+        // ensure overlay views are on top
+        handleLine.bringToFront();
+        info.bringToFront();
+        dragKnob.bringToFront();
+
+        // setup pinch-to-zoom
         scaleDetector = new ScaleGestureDetector(this,
                 new ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     @Override
@@ -78,10 +82,10 @@ public class GraphActivity extends AppCompatActivity {
                 });
         timeline.setOnTouchListener((v, ev) -> {
             scaleDetector.onTouchEvent(ev);
-            return false;
+            return false; // allow scroll & knob touches
         });
 
-        // Zoom buttons
+        // zoom button handlers
         btnZoomIn.setOnClickListener(v -> {
             scaleFactor = Math.min(scaleFactor * 1.25f, 3.0f);
             timeline.setScaleX(scaleFactor);
@@ -95,82 +99,71 @@ public class GraphActivity extends AppCompatActivity {
             timeline.refresh();
         });
 
-        // Position info bubble vertically immediately after layout
-        info.post(() -> {
-            int marginPx = (int)(8 * getResources().getDisplayMetrics().density);
-            float infoY = scroll.getY() + scroll.getHeight() - info.getHeight() - marginPx;
-            info.setY(infoY);
-            // bring above timeline
-            handleLine.bringToFront();
-            info.bringToFront();
-        });
-
-        // Allow timeline scrolling to reposition handle & info in sync
-        scroll.setOnScrollChangeListener((v, scrollX, scrollY, oldX, oldY) -> {
-            // when scrolled, maintain the info & line relative to content X
-            float contentPosX = handleLine.getTranslationX() + (handleLine.getWidth()/2f) + scrollX;
-            float viewX = scrollX + (scroll.getWidth()/2f);
-            handleLine.setTranslationX(viewX - (handleLine.getWidth()/2f));
-            info.setTranslationX(viewX - (info.getWidth()/2f));
-            updateInfo(contentPosX);
-            handleLine.bringToFront();
-            info.bringToFront();
-        });
-
-        // Drag info bubble as handle as handle
-        info.setOnTouchListener((v, ev) -> {
+        // drag knob listener (clamped to full viewport width)
+        dragKnob.setOnTouchListener((v, ev) -> {
+            scaleDetector.onTouchEvent(ev);
             switch (ev.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    downX = ev.getRawX();
-                    startTX = v.getTranslationX();
+                    knobStartX = ev.getRawX();
+                    knobInitialTranslate = v.getTranslationX();
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    float dx = ev.getRawX() - downX;
-                    float newTX = startTX + dx;
-                    // clamp within content scaled width
-                    float contentW = scroll.getChildAt(0).getWidth() * scaleFactor;
-                    float halfW = v.getWidth() / 2f;
-                    newTX = Math.max(-halfW, Math.min(newTX, contentW - halfW));
+                    float dx = ev.getRawX() - knobStartX;
+                    float newTX = knobInitialTranslate + dx;
+                    // clamp to visible scroll width
+                    float viewportW = scroll.getWidth();
+                    float maxTX     = viewportW - v.getWidth();
+                    newTX = Math.max(0, Math.min(newTX, maxTX));
                     v.setTranslationX(newTX);
-
-                    // Move line above bubble
-                    float centerX = newTX + halfW;
+                    float centerX = newTX + v.getWidth() / 2f;
                     handleLine.setTranslationX(centerX - handleLine.getWidth() / 2f);
-                    updateInfo(centerX);
+                    info.setTranslationX(centerX - info.getWidth() / 2f);
+                    updateKnobInfo(centerX);
                     return true;
                 default:
                     return false;
             }
         });
 
-        // Initial padding, scroll to end, position handles
+        // update info on scroll under the fixed white line
+        scroll.setOnScrollChangeListener((v, scrollX, scrollY, oldX, oldY) -> {
+            float centerInViewport = scroll.getWidth() / 2f;
+            // keep overlays centered
+            handleLine.setTranslationX(centerInViewport - handleLine.getWidth() / 2f);
+            info.setTranslationX(centerInViewport - info.getWidth() / 2f);
+            // update bubble content
+            updateKnobInfo(centerInViewport);
+            // ensure it stays visible
+            handleLine.bringToFront();
+            info.bringToFront();
+            dragKnob.bringToFront();
+        });
+
+        // initial padding + scroll-to-end + center overlays
         scroll.post(() -> {
-            int halfVp = scroll.getWidth() / 2;
+            int halfView = scroll.getWidth() / 2;
             timeline.setPadding(
                     timeline.getPaddingLeft(),
                     timeline.getPaddingTop(),
-                    halfVp,
+                    halfView,
                     timeline.getPaddingBottom()
             );
-            int rawW = scroll.getChildAt(0).getWidth();
-            scroll.scrollTo(rawW - scroll.getWidth(), 0);
+            int fullW = scroll.getChildAt(0).getWidth();
+            scroll.scrollTo(fullW - scroll.getWidth(), 0);
 
-            float endX = rawW * scaleFactor;
-            float tx = endX - scroll.getScrollX() - (handleLine.getWidth() / 2f);
-            handleLine.setTranslationX(tx);
-            info.setTranslationX(tx + (handleLine.getWidth() / 2f) - (info.getWidth() / 2f));
-            updateInfo(endX);
+            float centerVp = scroll.getWidth() / 2f;
+            dragKnob.setTranslationX(centerVp - dragKnob.getWidth() / 2f);
+            handleLine.setTranslationX(centerVp - handleLine.getWidth() / 2f);
+            info.setTranslationX(centerVp - info.getWidth() / 2f);
+            updateKnobInfo(centerVp);
 
-            // align info at bottom of scroll
-            int marginPx = (int)(8 * getResources().getDisplayMetrics().density);
-            float infoY = scroll.getY() + scroll.getHeight() - info.getHeight() - marginPx;
-            info.setY(infoY);
-
+            // re-bring to front after layout
             handleLine.bringToFront();
             info.bringToFront();
+            dragKnob.bringToFront();
         });
 
-        // CSV Viewer
+        // CSV viewer
         btnViewCsv.setOnClickListener(v -> showCsvDialog());
     }
 
@@ -186,14 +179,7 @@ public class GraphActivity extends AppCompatActivity {
         handler.removeCallbacks(refresher);
     }
 
-    private void updateInfo(float contentX) {
-        long ts = timeline.getTimestampForX((int)contentX);
-        String ssid = timeline.getSsidAtTime(ts);
-        String time = new SimpleDateFormat("HH:mm", Locale.getDefault())
-                .format(new Date(ts));
-        info.setText(time + "\n" + ssid);
-    }
-
+    // Show parsed CSV with readable times
     private void showCsvDialog() {
         StringBuilder sb = new StringBuilder();
         SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
@@ -207,26 +193,40 @@ public class GraphActivity extends AppCompatActivity {
                 if (p.length < 3) continue;
                 long ts = Long.parseLong(p[0]);
                 boolean conn = Float.parseFloat(p[1]) == 1f;
-                sb.append(String.format(Locale.getDefault(),
-                        "%s | %s       | %s\n",
-                        fmt.format(new Date(ts)),
+                String ss = p[2];
+                String tstr = fmt.format(new Date(ts));
+                sb.append(String.format("%s | %s       | %s\n",
+                        tstr,
                         conn ? "ON" : "OFF",
-                        p[2]
+                        ss
                 ));
             }
         } catch (Exception e) {
             sb.append("Error reading CSV: ").append(e.getMessage());
         }
-        ScrollView sv = new ScrollView(this);
+        // scrollable monospace view
+        ScrollView scrollView = new ScrollView(this);
         TextView tv = new TextView(this);
         tv.setTypeface(Typeface.MONOSPACE);
         tv.setText(sb.toString());
         tv.setPadding(16,16,16,16);
-        sv.addView(tv);
+        scrollView.addView(tv);
         new AlertDialog.Builder(this)
                 .setTitle("Raw CSV Data")
-                .setView(sv)
-                .setPositiveButton("Close", (d, w) -> d.dismiss())
+                .setView(scrollView)
+                .setPositiveButton("Close", (dlg, w) -> dlg.dismiss())
                 .show();
+    }
+
+    /**
+     * Given center X inside the TimelineView, show time & SSID.
+     */
+    private void updateKnobInfo(float knobCenterX) {
+        float viewX = scroll.getScrollX() + knobCenterX;
+        long ts = timeline.getTimestampForX((int)viewX);
+        String ssid = timeline.getSsidAtTime(ts);
+        String time = new SimpleDateFormat("HH:mm", Locale.getDefault())
+                .format(new Date(ts));
+        info.setText(time + "\n" + ssid);
     }
 }
