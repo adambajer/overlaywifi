@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Horizontal scrolling custom TimelineView -->
+    <HorizontalScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:fillViewport="true"
+        android:contentDescription="Timeline scroll area"
+        android:layout_alignParentTop="true">
+
+        <com.example.overlaywifi.TimelineView
+            android:id="@+id/timeline"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent" />
+    </HorizontalScrollView>
+
+    <!-- Centered white handle line -->
+    <View
+        android:id="@+id/handle_line"
+        android:layout_width="2dp"
+        android:layout_height="200dp"
+        android:layout_alignTop="@id/scroll"
+        android:layout_alignBottom="@id/scroll"
+        android:layout_centerHorizontal="true"
+        android:background="#FFFFFF" />
+    <!-- after your handle_line View, but before the controls at the very bottom -->
+    <TextView
+        android:id="@+id/info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBottom="@id/scroll"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="8dp"
+        android:padding="8dp"
+        android:background="@android:drawable/dialog_holo_light_frame"
+        android:textColor="#000000"
+        android:text="00:00\nSSID" />
+
+
+    <!-- Controls container -->
+    <LinearLayout
+        android:id="@+id/controls"
+        android:orientation="horizontal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="16dp">
+
+        <Button
+            android:id="@+id/btn_zoom_in"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="＋ Zoom In" />
+
+        <Button
+            android:id="@+id/btn_zoom_out"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="－ Zoom Out" />
+
+        <Button
+            android:id="@+id/btn_view_csv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="View CSV" />
+    </LinearLayout>
+
+</RelativeLayout>
