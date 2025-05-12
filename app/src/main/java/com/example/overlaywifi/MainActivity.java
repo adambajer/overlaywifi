@@ -26,14 +26,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         /* 1) Draw-over-apps */
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                !Settings.canDrawOverlays(this)) {
-            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-            startActivityForResult(i, REQ_OVERLAY);
-            return;
-        }
-
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            !Settings.canDrawOverlays(this)) {
+                Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                                startActivityForResult(i, REQ_OVERLAY);
+                                    return;
+                                    }
         /* 2) Dangerous run-time perms */
         if (requestMissingRuntimePerms()) return;
 
@@ -43,19 +42,19 @@ public class MainActivity extends AppCompatActivity {
 
     /* ---------- callbacks ---------- */
 
-    @Override public void onActivityResult(int rq, int res, @Nullable Intent d) {
-        super.onActivityResult(rq, res, d);
-        if (rq == REQ_OVERLAY) {
-            if (Settings.canDrawOverlays(this)) {
-                if (!requestMissingRuntimePerms()) startOverlayAndFinish();
-            } else {
-                Toast.makeText(this,"Bez povolení překrytí nelze pokračovat.",
-                        Toast.LENGTH_LONG).show();
-                finish();
-            }
-        }
-    }
-
+    @Override
+    public void onActivityResult(int rq, int res, @Nullable Intent data) {
+        super.onActivityResult(rq, res, data);
+            if (rq == REQ_OVERLAY) {
+                    if (Settings.canDrawOverlays(this)) {
+                                if (!requestMissingRuntimePerms()) startOverlayAndFinish();
+                                        } else {
+                                                    Toast.makeText(this, "Bez povolení překrytí nelze pokračovat.",
+                                                                        Toast.LENGTH_LONG).show();
+                                                                                    finish();
+                                                                                            }
+                                                                                                }
+                                                                                                }
     @Override public void onRequestPermissionsResult(int rq,
                                                      @NonNull String[] p,
                                                      @NonNull int[] r) {
