@@ -44,16 +44,16 @@ public class MainActivity extends AppCompatActivity {
     /* ---------- callbacks ---------- */
 
     @Override public void onActivityResult(int rq, int res, @Nullable Intent d) {
-    @Override
-protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-    super.onActivityResult(requestCode, resultCode, data);
-    if (requestCode == REQUEST_CODE) {
-        if (Settings.canDrawOverlays(this)) {
-            // Permission granted, continue
-        } else {
-            Toast.makeText(this, "Overlay permission not granted", Toast.LENGTH_SHORT).show();
+        super.onActivityResult(rq, res, d);
+        if (rq == REQ_OVERLAY) {
+            if (Settings.canDrawOverlays(this)) {
+                if (!requestMissingRuntimePerms()) startOverlayAndFinish();
+            } else {
+                Toast.makeText(this,"Bez povolení překrytí nelze pokračovat.",
+                        Toast.LENGTH_LONG).show();
+                finish();
+            }
         }
-    }
     }
 
     @Override public void onRequestPermissionsResult(int rq,
